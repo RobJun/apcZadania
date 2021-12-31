@@ -413,6 +413,9 @@ int main() {
 						if (cc.m_stav == stav) {
 							d = cc;
 							found = true;
+							if (d.m_children.empty()) {
+								d.m_children = getLegitMoves(stav, color);
+							}
 							break;
 						}
 					}
@@ -422,14 +425,15 @@ int main() {
 				}
 				if (!found) {
 					d = { stav };
+					d.m_children = getLegitMoves(stav, color);
 					lastDepth = 1;
 				}
 			}
 			else {
 				d = { stav };
+				d.m_children = getLegitMoves(stav, color);
 				lastDepth = 1;
 			}
-			d.m_children = getLegitMoves(stav, color);
 			if (d.m_children.empty()) {
 				std::clog << "ziadne pohyby" << std::endl;
 				return EXIT_FAILURE;

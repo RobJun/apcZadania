@@ -7,7 +7,7 @@ import time
 stav = "---------------------------OX------XO---------------------------"
 executableFile = "Z:\\5_semester\\APC\\uloha6\\x64\\Release\\uloha6.exe"
 timeFirst = 2
-timeSecond = 2
+timeSecond = 20
 
 def getMovesB(board,color):
     moves = []
