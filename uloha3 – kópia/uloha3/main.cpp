@@ -7,28 +7,32 @@
 
 std::vector<std::string> readLinesFromFile(std::ifstream& file) {
 	std::vector<std::string> result;
-	std::string resStr = "" , buffer = "";
-	buffer.resize(1024);
-	//precitaj cely subor
-	while (file.read(buffer.data(), 1024)) {
-		resStr += buffer;
+	std::string buffer;
+	/*while (std::getline(file, buffer)) {
+		result.push_back(buffer);
+	}*/
+	buffer.resize(1000);
+	std::string res = "";
+	while (file.read(buffer.data(),buffer.size())) {
+		res.append(buffer);
 	}
-	buffer.resize(file.gcount());
-	resStr += buffer;
-
-	size_t startOfRow = 0;
-	size_t newLine = resStr.find('\n');
-	while (newLine != resStr.npos) {
-		result.push_back(resStr.substr(startOfRow, newLine - startOfRow + 1));
-		startOfRow = newLine + 1;
-		newLine = resStr.find('\n',startOfRow);
+	size_t shrink = file.gcount();
+	if (shrink > 0) {
+		buffer.resize(shrink);
+		res.append(buffer);
 	}
-	if(resStr.size() - startOfRow != 0)
-		result.push_back(resStr.substr(startOfRow, resStr.size()- startOfRow));
-
+	size_t from = 0, to = res.find('\n',from);
+	bool empty = true;
+	while (to != res.npos) {
+		result.push_back(res.substr(from, to-from+1));
+		from = to + 1;
+		to = res.find('\n', from);
+		empty = false;
+	}
+	if (!empty)
+		result.push_back(res.substr(from, res.length() - from));
 	return result;
 }
-
 
 std::vector<std::string> getAllOptions(std::string line) {
 	std::stringstream iss(line);
@@ -38,22 +42,38 @@ std::vector<std::string> getAllOptions(std::string line) {
 		result.push_back(str);
 		if (result.size() == 3) break;
 	}
-	if (result.size() >= 2) {
-		size_t afterCommand = line.find(result[1],line.find(result[0])+1);
-		result.push_back(line.substr(afterCommand, line.length() - afterCommand));
-	}
+	result.push_back(line);
 
- 	return result;
+	return result;
+}
+//false - string
+//true - Range
+bool stringOrRange(std::string& string) {
+	size_t comma = string.find(',');
+	if (comma == string.npos) {
+		if (string.find_first_not_of("01234567890") != string.npos) {
+			return false;
+		}
+		return true;
+	}
+	else {
+		if (string.find(',', comma + 1) != string.npos) {
+			return false;
+		}
+		if (string.find_first_not_of("0123456789,") != string.npos) {
+			return false;
+		}
+		return true;
+	}
 }
 
 // parser na range
 bool getRanges(std::string& string, size_t& from, size_t& to, size_t max) {
 	size_t commaI = string.find(',', 0);
-	if (commaI == string.npos) { // ak range je iba jeden riadok 
+	if (commaI == string.npos) {
 		if (string.find_first_not_of("0123456789") != string.npos) {
 			return false;
 		}
-		if (string.size() > 19) return false;
 		from = to = std::stoull(string);
 		if (from == 0) {
 			return false;
@@ -61,147 +81,158 @@ bool getRanges(std::string& string, size_t& from, size_t& to, size_t max) {
 		from -= 1;
 		return true;
 	}
-	else {	//ak je to range
+	else {
 		if (string.find(',', commaI + 1) != string.npos || string.find_first_not_of(",0123456789") != string.npos) {
-			//obsahoval ciarky navyse alebo nieco ine ako cislo a ciarku
 			return false;
 		}
 		std::string num1 = string.substr(0, commaI);
 		std::string num2 = string.substr(commaI + 1, string.length() - commaI - 1);
 		if (!num1.empty()) {
-			//ak je cislo vacsie ako je mozne
-			if (num1.size() > 19) return false;
-			else {
-				from = std::stoull(num1);
-				//ak je cislo 0 tak je to invalid range
-				if (from == 0) return false;
-			}
+			from = std::stoull(num1);
 		}
 		if (!num2.empty()) {
-			if (num2.size() > 19) return false;
 			to = std::stoull(num2);
-			if (to == 0) return false;
-			if (from > to) {
-				return false;
-			}
 		}
-		else {to = max;}
+		else {
+			to = max;
+		}
+		if (from == 0 || to == 0) {
+			return false;
+		}
 		from -= 1;
 		return true;
 	}
 }
 
-
 void writeMode(std::vector<std::string>& data) {
 	std::string inWrite;
 	std::getline(std::cin, inWrite);
 	while (inWrite.size() != 1 || inWrite[0] != '.') {
-	//while (std::getline(std::cin, inWrite)) {
-		//if (inWrite.size() == 1 && inWrite[0] == '.') return;
-		if (data.size() == 1 && data.back().empty()) data.pop_back();
-		//ak za poslednym riadkom nie je \n vloz ho tam
-		if(!data.empty() && data.back().find('\n') == data.back().npos) data.back() += '\n';
-		data.push_back(inWrite+'\n');
+		data.push_back(inWrite);
 		std::getline(std::cin, inWrite);
 	}
 }
 
 
-void appendToPoint(std::vector<std::string>& data, std::vector<std::string>& insert, size_t line) {
-	//vkladanie prazdnych riadkov
-	if (data.size() < line) {
-		size_t size = line - data.size();
-		for (size_t i = 0; i < size; i++) {
-			//ak za poslednym riadkom nie je \n vloz ho tam
-			if (!data.empty() && data.back().find('\n') == data.back().npos) data.back() += '\n';
-			data.push_back("");
-		}
-	}
-	//ak za riadok ktory sme vlozili
-	if (line != 0 && data[line - 1].find('\n') == data[line - 1].npos)
-		data[line - 1] += '\n';
-	data.insert(data.begin() + line, insert.begin(), insert.end());
-}
-
-
 void insertInto(std::vector<std::string>& data, std::vector<std::string> options, bool change) {
-	if (options.size() == 1) {
+	if (options.size() == 2) {
 		writeMode(data);
 	}
-	else if (options.size() >= 3) {
-		size_t line = data.size();
-		bool range = false;
-		if (change) { //ak bol zavolany pomocou change
-			size_t from = 1, to = data.size();
+	else if (options.size() == 3 && ((change && stringOrRange(options[1])) || options[1].find_first_not_of("0123456789") == options[1].npos)) {
+		size_t line = 0;
+		if (change) {
+			size_t from = 0, to = data.size();
 			if (!getRanges(options[1], from, to, data.size())) {
-				line = 0;
-				range = false;
+				return;
 			}
-			else {
-				line = from;
-				range = true;
-			}
+			line = from;
 		}
-		else if (options[1].find_first_not_of("0123456789") == options[1].npos) { // ci je druhy parameter cislo
-			if (options[1].size() > 19) return;   //ak je cislo vacsie ako povolene
+		else if(options[1].find_first_not_of("0123456789") == options[1].npos) {
 			line = std::stoull(options[1]);
-			range = true;
+			/*if (line == 0) {
+				return;
+			}*/
 		}
-
 		std::vector<std::string> insert;
-		if (options.size() > 3 || !range) {
-			size_t oneLinerStart = options[1].length();
-			oneLinerStart = (range) ? options[3].find_first_not_of("\t ", oneLinerStart) : 0;
-			insert.push_back(options.back().substr(oneLinerStart, options.back().size() - oneLinerStart) + '\n');
+		writeMode(insert);
+		if (data.size() < line) {
+			size_t size = line - data.size();
+			for (size_t i = 0; i <size; i++) {
+				data.push_back("");
+			}
+		}
+		data.insert(data.begin() + line, insert.begin(), insert.end());
+	}
+	else {
+		if (options.size() == 3) {
+			data.push_back(options[1]);
 		}
 		else {
-			//citaj to co chce pouzivatel pridat
-			writeMode(insert);
+			bool range = false;
+			size_t line = data.size();
+			if (change && stringOrRange(options[1])) {
+				size_t from = 0, to = data.size();
+					if (!getRanges(options[1], from, to, data.size())) {
+						return;
+					}
+				line = from;
+				range = true;
+			} 
+			else if (options[1].find_first_not_of("0123456789") == options[1].npos){
+				line = std::stoull(options[1]);
+				/*if (line == 0) {
+					return;
+				}*/
+				range = true;
+			}
+			std::vector<std::string> insert;
+			size_t oneLinerStart = options[3].find_first_of(" \t");
+			if (range) {
+				oneLinerStart = options[3].find_first_of(" \t", oneLinerStart + 1);
+			}
+			insert.push_back(options[3].substr(oneLinerStart+1,options[3].size() - oneLinerStart));
+			if (data.size() < line) {
+				size_t size = line - data.size();
+				for (size_t i = 0; i < size; i++) {
+					data.push_back("");
+				}
+			}
+			data.insert(data.begin() + line, insert.begin(), insert.end());
 		}
-		//pridaj nove riadky do vektora
-		appendToPoint(data, insert, line);
 	}
 }
 
 
 void deleteLines(std::vector<std::string>& data, std::vector<std::string> options, bool change) {
 	size_t from = 0, to = data.size();
-	if (options.size() >= 3) {
-		from = 1;
-		if (!getRanges(options[1], from, to, data.size())) {
-			if (!change) {	//ak funkcia nie je volana z c prikazu
-				std::cout << "Invalid range" << std::endl;
+	if (data.empty()) return;
+
+	if (options.size() == 3 || change) {
+		if (change && stringOrRange(options[1]) || !change) {
+			from = 1;
+			if (!getRanges(options[1], from, to, data.size())) {
+				std::cout << "Unsupported command" << std::endl;
 				return;
-			}
-			else {	//ak je tak sa vymaze cely subor
-				from = 0;
-				to = data.size();
-			}
-		}
-		else { // ak je to range
-			if (from >= data.size()) {
-				return;
-			}
-			if (to > data.size()) {
-				to = data.size();
 			}
 		}
 	}
-	//ak druhy range je vacsi ako pocet riadkov
+
+
+
+	if (from >= data.size()) {
+		std::cerr << "Presiahnutie pola" << std::endl;
+		return;
+	}
+	if (from > to) {
+		std::cout << "Invalid range" << std::endl;
+		return;
+	}
+	if (to > data.size()) {
+		to = data.size();
+	}
+
 	auto last = (data.size() > to) ? (data.begin() + to) : data.end();
+
 	data.erase(data.begin() + from, last);
 }
 
 void printFromTo(std::vector<std::string>& data,std::vector<std::string> options) {
 	size_t from = 0, to = data.size();
+	if (data.empty()) return;
+
 	if (options.size() == 3) {
 		from = 1;
 		if (!getRanges(options[1], from, to, data.size())) {
-			std::cout << "Invalid range" << std::endl;
+			std::cout << "Unsupported command" << std::endl;
 			return;
 		};
 	}
+	if (from > to) {
+		std::cout << "Invalid range" << std::endl;
+		return;
+	}
 	if (from >= data.size()) {
+		//std::cerr << "Presiahnutie pola" << std::endl;
 		return;
 	}
 	if (to > data.size()) {
@@ -211,22 +242,21 @@ void printFromTo(std::vector<std::string>& data,std::vector<std::string> options
 	for (auto it = data.begin() + from; it != data.begin() + to; it++) {
 		output+=*it;
 	}
-	std::cout << output;
+	
+	std::cout << output << std::endl;
 }
 
 
+//TODO: lepsie overovanie
 bool writeChangesToFile(std::string filename,std::vector<std::string> workString) {
 	std::ofstream file(filename);
 	
 	if (!file.is_open()) {
-		std::cerr << "nepodarilo sa ulozit do suboru" << std::endl;
+		std::cerr << "nepodarilo sa ulozit do suboru";
 		return false;
 	}
 	for (auto& str : workString) {
-		if (!(file << str)) {
-			std::cerr << "ERROR pocas zapisu do suboru" << std::endl;
-			return false;
-		};
+		file << str << std::endl;
 	}
 
 	file.close();
@@ -234,16 +264,26 @@ bool writeChangesToFile(std::string filename,std::vector<std::string> workString
 }
 
 
-bool hasUnsaved(std::vector<std::string> saved, std::vector<std::string> workString) {
-	if (workString.size() != saved.size()) {
+bool hasUnsaved(std::string filename, std::vector<std::string> workString) {
+	std::ifstream file(filename);
+	if (!file.is_open()) {
 		return true;
 	}
-	if (workString != saved) {
+	std::vector<std::string> tempFileContent = readLinesFromFile(file);
+
+	if (!file.eof()) {
+		return true;
+	}
+	file.close();
+
+	if (workString.size() != tempFileContent.size()) {
+		return true;
+	}
+	if (workString != tempFileContent) {
 		return true;
 	}
 	return false;
 }
-
 
 int main(int argc, char* argv[]) {
 	if (argc != 2) {
@@ -256,7 +296,7 @@ int main(int argc, char* argv[]) {
 	std::fstream temp;
 	temp.open(filename, std::ios::out | std::ios::app);
 	if (!temp.is_open()) {
-		std::cerr << "file isn't writeable" << std::endl;
+		std::cerr << "Nepodarilo otvorit subor" << std::endl;
 		return EXIT_FAILURE;
 	}
 	temp.close();
@@ -273,14 +313,9 @@ int main(int argc, char* argv[]) {
 
 		readFile.close();
 	}
-	else {
-		std::cerr << "file isn't readeable" << std::endl;
-		return EXIT_FAILURE;
-	}
-
-	std::vector<std::string> saved = fileContent;
 
 	bool close = false;
+
 	while (!close) {
 		std::cout << "* ";
 		std::string vstup;
@@ -291,25 +326,29 @@ int main(int argc, char* argv[]) {
 		}
 		auto options = getAllOptions(vstup);
 		std::string prepinacStr = options[0];
-		if (prepinacStr.size() != 1  && prepinacStr.compare("q!")) {
+
+		if ((prepinacStr.size() != 1  && prepinacStr.compare("q!"))) {
 			std::cout << "Unsupported command" << std::endl;
 		}
 		else {
 			bool over = false;
 			switch (prepinacStr[0]) {
 			case 'w':
-				if (options.size() == 1) {
+				if (options.size() < 3) {
 					if (!writeChangesToFile(filename, fileContent)) {
 						return EXIT_FAILURE;
 					}
-					saved = fileContent;
 				}
 				else { std::cout << "Unsupported command" << std::endl; }
 				break;
 			case 'q':
-				if (options.size() == 1) {
-					if (!prepinacStr.compare("q!")) { over = true; }
-					if (over || !hasUnsaved(saved, fileContent)) { close = true; }
+				if (options.size() < 3) {
+					if (!prepinacStr.compare("q!")) {
+						over = true;
+					}
+					if (over || !hasUnsaved(filename, fileContent)) {
+						close = true;
+					}
 					else {
 						std::cout << "You have unsaved changes" << std::endl;
 					}
@@ -327,7 +366,7 @@ int main(int argc, char* argv[]) {
 				break;
 			case 'd':
 				if (options.size() <= 3) {
-					deleteLines(fileContent, options,false);
+					deleteLines(fileContent, options, false);
 				}
 				else { std::cout << "Unsupported command" << std::endl;  }
 				break;
@@ -340,6 +379,8 @@ int main(int argc, char* argv[]) {
 				break;
 			}
 		}
+
+
 	}
 	return EXIT_SUCCESS;
 }
